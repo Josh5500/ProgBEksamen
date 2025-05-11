@@ -1,0 +1,414 @@
+let but1
+let but2
+let but3
+let gameBut
+let t1
+let t2
+let t3
+let t4
+let t5
+let showText1 = false
+let openState1 = true
+let openState2 = false
+let openState3 = false
+let showTextSquare = true
+let billy1
+let showBilly = true
+let showMorseAlfa = false
+let showColSquares = false
+let morseCodePic
+let actState1 = false
+let minigameActivation = false
+let gameDone = false
+let minutes = 8
+let seconds = 0
+let startTimer = false
+let payload
+let hintTimer1 = 10
+let hintTimer2 = 60
+let hintTimer3 = 60
+let activateHint1 = false
+let activateHint2 = false
+let activateHint3 = false
+let correctSound
+let activateSound = false
+let gådeNotComplete = true
+let haveSentSig2 = false
+let haveSentSig4 = false
+let regneTekst = false
+let vundetTekst = false
+let lydSpillet
+
+
+
+
+//Knap til at simulere at mini-spillet bliver færdigt
+let testBut
+
+function preload(){
+  correctSound = loadSound('answer-correct.mp3')
+}
+
+//Central funktion "gameorderMqtt()" med dataM5 som parameter, der gør det let overskueligt at styre signaler og deres korresponderende funktioner 
+function gameorderMqtt(dataM5) {
+  if (dataM5.riddleSolved === "detected1") {
+    gåde1Løst();
+  } else if (dataM5.riddleSolved === "detected2") {
+    gåde2Løst();
+  } else if (dataM5.riddleSolved === "detected3") {
+    gåde3Løst();
+  }
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  
+  billy1 = loadImage('SAW_hero.jpg')
+  morseCodePic = loadImage('morseCodeAlphabet.png')
+  //knapper til de første pages - de gemmes når de klikkes på
+  but1 = createButton("JA")
+  but1.position(windowWidth/1.2,windowHeight/1.2)
+  but1.size(80,80)
+  but1.mousePressed(con1)
+  
+  but2 = createButton("JA")
+  but2.position(windowWidth/1.2,windowHeight/1.2)
+  but2.size(80,80)
+  but2.mousePressed(con2)
+  but2.hide()
+  
+  but3 = createButton("JA")
+  but3.position(windowWidth/1.2,windowHeight/1.2)
+  but3.size(80,80)
+  but3.mousePressed(con3)
+  but3.hide()
+  
+  gameBut = createButton("Start spillet")
+  gameBut.position(windowWidth/2,windowHeight/2+30)
+  gameBut.size(80,80)
+  gameBut.mousePressed(startGame)
+  gameBut.hide()
+  
+  //Knap til at simulere at mini-spillet bliver færdigt
+  testBut = createButton("test")
+  testBut.mousePressed(testFunc)
+  
+  
+  //MQTT ///////
+  //definer en variabel connection til en forbindelse til skolens server. 
+  //connection = mqtt.connect("wss://mqtt.nextservices.dk");
+    connection = mqtt.connect("wss://test.mosquitto.org:8081");
+
+  //.on angiver, at jeg lytter efter en bestemt hændelse, og når den sker defineres sker noget. Hændelsen er en forbindelse til serveren.
+  connection.on("connect", () => {
+    console.log("Er nu forbundet til Next's MQTT server");
+  });
+//lyt til emnet "SAW/data" med .subscribe()
+  connection.subscribe('SAW/data');
+  //når en besked modtages fra connection.on, kør try-statementet, der definerer beskeden som dataM5 og kalder gameorderMqtt() - hvis ikke er der sket en error der er defineret som variablen "e"
+  connection.on("message", (topic, ms) => {
+    console.log("Observerer data: " + ms + " - på emnet: " + topic);
+    try {
+      let dataM5 = JSON.parse(ms.toString());
+      //call gameorderMqtt til at blive updated med dataM5's data hver gang data modtages
+      gameorderMqtt(dataM5)
+    } catch (e) {
+      console.error("Kunne ikke parse JSON:", e);
+    }
+  });
+}
+
+function draw() {
+  background('darkgreen');
+  
+  
+  //SKAL BILLY VISES?
+  if(showBilly){
+    image(billy1,0,0,windowWidth,windowHeight)
+  }
+  //SKAL FIRKANTER VISES
+  if (showColSquares) {
+  visFirkanter();
+}
+  //SKAL MORSEKODE ALFABET VISES?
+  if(showMorseAlfa){
+    image(morseCodePic,0,0,windowWidth,windowHeight)
+  }
+  //SKAL TEKST FIRKANT VISES?
+  if(showTextSquare){
+    fill(255,255,255,50)
+    rect(windowWidth/4,windowHeight/1.2,400,80)
+  }
+  //VIL DE STARTE?
+  if(openState1){
+    textSize(25)
+    textAlign(CENTER,CENTER)
+    fill(0,0,0,255)
+      t1 = text('Do you want to play a game?',windowWidth/2+20,windowHeight/1.1) 
+  }
+  //FORSTÅR DE SPILLET?
+  if(openState2){
+    textSize(20)
+    fill(0,0,0,255)
+    textAlign(CENTER,CENTER)
+      t2 = text('For at undgå shockerende konskvenser, skal i løse mine gåder ved at rotere ringene på de cirkulære kapsler!',windowWidth/3.5,windowHeight/2,windowWidth/1.8,windowHeight/1.2)
+  }
+  //HAR DE ARMBÅND PÅ?
+  if (openState3){
+    textSize(25)
+    fill(0,0,0,255)
+    textAlign(CENTER,CENTER)
+      t3 = text('Er stødarmbåndene taget på?',windowWidth/2+20,windowHeight/1.1)
+  }
+  //SKAL "CORRECT" LYD SPILLES?
+   if (activateSound && !lydSpillet) {
+  correctSound.play();
+     lydSpillet = true
+  // Når lyden slutter, nulstil activateSound til at være false
+  correctSound.onended(() => {
+    lydSpillet = false
+    activateSound = false;
+  });
+}
+  //ER DE KLAR? START TIMER
+  if(startTimer){
+    timer()
+  }
+  //De starter mini-gamet efter cryptex 1 er løst
+  if(minigameActivation){
+    for (let i = 0; i < 1; i++) {
+    gameBut.show()
+    }
+    showBilly = true
+    textSize(30)
+    textAlign(CENTER,CENTER)
+      t4 = text('I skal nu spille et minigame',windowWidth/2+20,windowHeight/2)
+  }
+  //3. Er minigamet færdigt? Send besked til m5 for at starte cryptex 2 LED flash
+  if(gameDone){
+    activateHint2 = true
+   if (!haveSentSig2) {
+    for (let i = 0; i < 1; i++) {
+      let payload = JSON.stringify({
+    activeSignal: 'sig2',
+  });
+  connection.publish('SAW/data', payload, { qos: 0 },);
+      console.log("Besked sig2 er sendt 1 gang")
+    }
+    
+  }
+    haveSentSig2 = true
+  }
+  //skal regnetekst vises?
+  if(regneTekst){
+    fill('black')
+    t5 = text("Fire brødre står på række. Den første er dobbelt så meget som den tredje del af 9. Den næste står stabilt – som benene under en stol. Den tredje gemmer sig mellem 8 og 10. Den sidste er det første lige tal, men ikke 0.",windowWidth/3.5,windowHeight/1.7, windowWidth/2,windowHeight/2.4)
+  }
+  //skal vinde tekst vises?
+  if(vundetTekst){
+    text("I har overlevet min gåde - for nu...",windowWidth/2,windowHeight/2)
+  }
+  
+  
+  //Timer 1 cryptex 1
+  if(activateHint1){
+  if (frameCount % 60 == 0 && hintTimer1 > 0) { 
+    hintTimer1 --;
+  }
+  }
+  if(hintTimer1 == 0 && activateHint1){
+    fill('red')
+    text("Mon den blinkende LED blinker i morsekode?",windowWidth/3.5,windowHeight/2,windowWidth/2,windowHeight/4)
+  }
+  //Timer 2 cryptex 2
+  if(activateHint2){
+  if (frameCount % 60 == 0 && hintTimer2 > 0) { 
+    hintTimer2 --;
+  }
+  }
+  if(hintTimer2 == 0 && activateHint2){
+    fill('red')
+    text("Kan der mon indstilles farver på en af mekanismerne?",windowWidth/3.5,windowHeight/2,windowWidth/2,windowHeight/4)
+  }
+  //Timer 3 cryptex 3
+  if(activateHint3){
+  if (frameCount % 60 == 0 && hintTimer3> 0) { 
+    hintTimer3--;
+  }
+  }
+  if(hintTimer3== 0 && activateHint3){
+    fill('red')
+   text("Digtet er en gåde, hvis løsning er en talkombination",windowWidth/3.5,windowHeight/2,windowWidth/2,windowHeight/4)
+  }
+  
+}
+ //2. De indtaster "BLOD" på cryptex 1 som p5 modtager:
+  function gåde1Løst(){
+    //når den er true, call et if statement i draw
+    minigameActivation = true
+    showMorseAlfa = false
+    showTextSquare = false
+    activateHint1 = false
+    activateSound = true
+    console.log("cryptex 1 er klaret");
+  }
+//4. De indtaster hvid,gul,hvid og sort på cryptex 2 og trækker den ud, kredsløb stoppes og   besked modtages:  
+  function gåde2Løst(){
+    showColSquares = false
+    activateSound = true
+    activateHint2 = false
+    activateHint3 = true
+    //5. Send besked til cryptex 3 LED om at flashe
+    let payload = JSON.stringify({
+    activeSignal: 'sig3',
+  });
+  connection.publish('SAW/data', payload, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Publish error:', err);
+    } else {
+      console.log('Message published successfully');
+    }
+    });
+    showBilly = true
+    regneTekst = true
+    console.log("cryptex 2 er klaret")
+  }
+//6.GÅDE KLARES: De indtaster 6492 på cryptex 3 og trækker i den, så kredsløb stoppes og besked modtages:
+function gåde3Løst(){
+    activateSound = true
+    activateHint3 = false
+    gådeNotComplete = false
+    textSize(30)
+    textAlign(CENTER,CENTER)
+    regneTekst = false
+    vundetTekst = true
+    console.log("cryptex 3 er klaret")
+  }
+//Knap 1 (Spille?) caller:
+function con1(){
+  but1.hide()
+  openState1 = false
+  actState1 = true
+  but2.show()
+  openState2 = true
+}
+//Knap 2 (stødarmbånd på?) caller:
+function con2(){
+  openState2 = false
+  but2.hide()
+  but3.show()
+  openState3 = true
+}
+//Knap 3 (forstår regler?) caller: 
+function con3(){
+  //1. Send besked til mqtt / start morsekode, vis morsealfabet og start cryptex 1 flashing
+  openState3 = false
+  but3.hide()
+  showBilly = false
+  showMorseAlfa = true
+  startTimer = true
+  activateHint1 = true
+  let payload = JSON.stringify({
+    activeSignal: 'sig1',
+  });
+
+  connection.publish('SAW/data', payload, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Publish error:', err);
+    } else {
+      console.log('Message published successfully');
+    }
+    });
+    
+  
+}
+//Start mini-game
+function startGame(){
+  //sluk først cryptex 1 LED
+  let payload = JSON.stringify({
+    activeSignal: 'sig1SLUK',
+  });
+
+  connection.publish('SAW/data', payload, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Publish error:', err);
+    } else {
+      console.log('Message published successfully');
+    }
+    });
+  gameBut.hide()
+  minigameActivation = false
+  
+}
+function timer(){  
+  textAlign(CENTER, CENTER);
+  textSize(30);
+  fill('red')
+  strokeWeight(4)
+  stroke('black')
+  rect(width/9-75,height/10-50,windowWidth/6,windowHeight/12)
+  fill('black')
+  noStroke()
+  text(minutes, width/10-20, height/20);
+  text(":", width/10, height/20)
+  text(seconds, width*2.1/16, height/20)
+
+  if (minutes > 0 && seconds == 0 && frameCount == 1 ) { // if the frameCount is divisible by 60, then a second has passed. it will stop at 0
+    minutes --;
+  } 
+    if (minutes > 0 && seconds == 0 && frameCount % 60 == 0){
+    seconds = 60;
+  }
+  if (seconds == 60){
+    minutes--;
+  }
+  if (seconds <= 60 && frameCount % 60 ==0){
+    seconds--;
+  }
+  
+
+  
+  if (gådeNotComplete && minutes == 0 && seconds < 0) {
+    fill('red')
+    textSize(50)
+    textAlign(CENTER,CENTER)
+    text("GAME OVER", windowWidth/2, windowHeight/2);
+    text("FORBERED JER PÅ SMERTE!!", windowWidth/2, windowHeight/2-50);
+    //7. send besked til stødarmbånd m5 for at åbne relæ
+    if (!haveSentSig4) {
+    for (let i = 0; i < 1; i++) {
+      let payload = JSON.stringify({
+    activeSignal: 'sig4',
+  });
+  connection.publish('SAW/data', payload, { qos: 0 },);
+      console.log("Besked sig4 er sendt 1 gang")
+    }
+    
+  }
+    haveSentSig4 = true
+    noLoop()
+  }
+}
+function visFirkanter(){
+   for (let i = 0; i < 1; i++) {
+  console.log("firkant vises")
+    fill(0); // sort
+  rect(windowWidth/2+80, windowHeight/2, 40, 40);
+
+  fill(255) // hvid
+  rect(windowWidth/2+25, windowHeight/2, 40, 40);
+
+  fill(255, 255, 0); // Gul
+  rect(windowWidth/2-25, windowHeight/2, 40, 40);
+
+  fill(255); // hvid
+  rect(windowWidth/2-80, windowHeight/2, 40, 40);
+   }
+}
+
+// TEST FUNKTION SOM TIL AT SIMULERE MINIGAMET BLIVER FÆRDIGT
+function testFunc(){
+    gameDone = true
+    showColSquares = true
+
+  }
