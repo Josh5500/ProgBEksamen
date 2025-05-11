@@ -1,0 +1,74 @@
+
+from m5stack import *
+from m5ui import *
+from uiflow import *
+from m5mqtt import M5mqtt
+import json
+
+from libs.json_py import *
+from easyIO import *
+import unit
+
+setScreenColor(0x111111)
+neopixel_0 = unit.get(unit.NEOPIXEL, unit.PORTA, 10)
+
+signal1 = None
+sent = False
+wireStatus = "ingen berøring"
+m5Status = "ikke aktiv"
+beskedSendt = "ikke sendt"
+
+# DEBUGGING
+beskedLabel = M5TextBox(5, 20, "besked til P5 er:" + beskedSendt, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+activeStateLabel = M5TextBox(5, 60, "m5 er:" + m5Status, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+wiresLabel = M5TextBox(5, 100, "Wires:" + wireStatus, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+signalLabel = M5TextBox(5, 140, "signal er:", lcd.FONT_Default, 0xFFFFFF, rotate=0)
+
+# Funktion til at hente data fra SAW/data
+def fun_SAW_data(topic_data):
+    global signal1
+    try:
+        if 'activeSignal' in topic_data:
+            signal1 = get_json_key(topic_data, 'activeSignal')
+            signalLabel.setText("signal er: " + str(signal1))
+        else:
+            signalLabel.setText("Ingen activeSignal modtaget")
+    except Exception as e:
+        signalLabel.setText("Signal havde fejl", e)
+
+m5mqtt = M5mqtt('', 'test.mosquitto.org', 1883, '', '', 300)
+m5mqtt.subscribe('SAW/data', fun_SAW_data)
+m5mqtt.start()
+# main loop der kører uendeligt
+while True:
+  # not sent bliver executed da not (omvendte) af sent (defineret til false i starten) bliver til true. 
+    if digitalRead(0) == 0 and not sent:
+        neopixel_0.setColor(1, 0x000000)
+        wireStatus = "roer ikke"
+        wiresLabel.setText("Wires: " + wireStatus)
+        if signal1 == 'sig1':
+            neopixel_0.setColor(1, 0xff0000)
+            m5Status = "aktiv"
+            activeStateLabel.setText("m5 er: " + m5Status)
+
+    if digitalRead(0) == 1 and not sent:
+        m5mqtt.publish('SAW/data', str(py_2_json({'riddleSolved': 'detected1'})), 0)
+        neopixel_0.setColor(1, 0x008000)
+        # når sent er blevet sat til true, vil not sent blive false (not true = false) - dermed sendes kun 1 besked da betingelserne kun kører 1 gang.
+        beskedSendt = "sendt"
+        beskedLabel.setText("besked til P5 er:" + beskedSendt)
+        if signal1 == 'sig1':
+            wireStatus = "roerte"
+            wiresLabel.setText("Wires: " + wireStatus)
+        sent = True
+
+    if signal1 == 'sig1SLUK':
+        neopixel_0.setColor(1, 0x000000)
+        signal1 = None
+        signalLabel.setText("signal er: sig1SLUK")
+        m5Status = "ikke aktiv"
+        activeStateLabel.setText("m5 er:" + m5Status)
+        # koden køres ikke igen med break
+        break
+
+    wait_ms(2)
