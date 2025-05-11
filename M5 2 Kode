@@ -1,0 +1,65 @@
+
+from m5stack import *
+from m5ui import *
+from uiflow import *
+from libs.json_py import *
+from m5mqtt import M5mqtt
+from easyIO import *
+import time
+import unit
+
+
+setScreenColor(0x111111)
+neopixel_0 = unit.get(unit.NEOPIXEL, unit.PORTA, 10)
+
+
+signal2 = None
+beskedSendt = "ikke sendt"
+m5Status = "ikke aktiv"
+wireStatus = ""
+
+# DEBUGGING
+beskedLabel = M5TextBox(5, 20, "besked til P5 er:" + beskedSendt, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+activeStateLabel = M5TextBox(5, 60, "m5 er:" + m5Status, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+wiresLabel = M5TextBox(5, 100, "Wires:" + wireStatus, lcd.FONT_Default, 0xFFFFFF, rotate=0)
+signalLabel = M5TextBox(5, 140, "signal er:", lcd.FONT_Default, 0xFFFFFF, rotate=0)
+
+
+# Funktion til at hente data fra SAW/data
+def fun_SAW_data_(topic_data):
+    global signal2
+    signal2 = get_json_key(topic_data, 'activeSignal')
+    signalLabel.setText("signal er:" + signal2)
+
+
+
+
+m5mqtt = M5mqtt('', 'test.mosquitto.org', 1883, '', '', 300)
+m5mqtt.subscribe(str('SAW/data'), fun_SAW_data_)
+m5mqtt.start()
+# main loop der kører uendeligt
+while True:
+    # Hvis den er i active-state og ledninger ikke rør, så gør:
+  if (digitalRead(0)) == 0 and signal2 == 'sig2':
+    try:
+        m5mqtt.publish(str('SAW/data'), str((py_2_json({'riddleSolved': 'detected2'}))), 0)
+        beskedSendt = "sendt"
+    except Exception as e:
+        beskedSendt = "fejlet: " + str(e)
+    beskedLabel.setText("besked til P5 er:" + beskedSendt)
+    wireStatus = "har ikke forbindelse"
+    wiresLabel.setText("Wires: " + wireStatus)
+    m5Status = "ikke aktiv"
+    activeStateLabel.setText("m5 er: " + m5Status)
+    break
+  # Hvis den er i active-state og ledninger rør, så gør:
+  if (digitalRead(0)) == 1 and signal2 == 'sig2':
+    m5Status = "aktiv"
+    activeStateLabel.setText("m5 er: " + m5Status)
+    wireStatus = "har forbindelse"
+    wiresLabel.setText("Wires: " + wireStatus)
+    neopixel_0.setColor(1, 0xff0000)
+    wait(0.5)
+    neopixel_0.setColor(1, 0x000000)
+    wait(0.5)
+  wait_ms(2)
