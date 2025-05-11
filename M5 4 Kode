@@ -1,0 +1,45 @@
+
+from m5stack import *
+from m5ui import *
+from uiflow import *
+from m5mqtt import M5mqtt
+from libs.json_py import *
+import time
+import unit
+
+
+setScreenColor(0x111111)
+relay_0 = unit.get(unit.RELAY, unit.PORTA)
+
+signal4 = None
+shockActive = False
+
+shockLabel = M5TextBox(5, 20, "Stoed givet:" + str(shockActive), lcd.FONT_Default, 0xFFFFFF, rotate=0)
+signalLabel = M5TextBox(5, 60, "Signal er:", lcd.FONT_Default, 0xFFFFFF, rotate=0)
+
+
+def fun_SAW_data_(topic_data):
+  global signal4
+  signal4 = get_json_key(topic_data, 'activeSignal')
+  signalLabel.setText(str(signal4))
+  signalLabel.setText("signal er:" + signal4)
+  if signal4 == 'sig4':
+    shockActive = True
+    shockLabel.setText("Stoed givet:" + str(shockActive))
+    for count in range(1):
+      relay_0.on()
+      wait(0.4)
+      relay_0.off()
+      wait(0.8)
+      relay_0.on()
+      wait(0.4)
+      relay_0.off()
+      wait(0.8)
+      relay_0.on()
+      wait(0.4)
+      relay_0.off()
+
+
+m5mqtt = M5mqtt('', 'test.mosquitto.org', 0, '', '', 300)
+m5mqtt.subscribe(str('SAW/data'), fun_SAW_data_)
+m5mqtt.start()
